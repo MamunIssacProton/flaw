@@ -1,35 +1,141 @@
-name: CI
+name: Multi-Stage Deployment
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  build:
+  deploy-dev:
+    name: Deploy to Dev
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Verify project files
-        run: |
-          echo "Repository checked out successfully"
-          ls -la
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v3
+        with:
+          versionSpec: '6.x'
 
-      - name: Run file validation
+      - name: Determine version
+        id: version
+        uses: gittools/actions/gitversion/execute@v3
+        with:
+          useConfigFile: true
+
+      - name: Dev deployment started
         run: |
-          echo "Checking for required files..."
-          for f in data.txt; do
-            if [ -f "$f" ]; then
-              echo "  ✓ $f exists"
-            else
-              echo "  ✗ $f is missing" && exit 1
-            fi
-          done
-          echo "All checks passed."
+          echo "========================================"
+          echo "  DEV DEPLOYMENT STARTED"
+          echo "  Version: dev-${{ steps.version.outputs.semVer }}"
+          echo "  Commit:  ${{ github.sha }}"
+          echo "  Run:     ${{ github.run_number }}"
+          echo "========================================"
+
+      - name: Deploy to dev
+        run: |
+          echo "Deploying dev-${{ steps.version.outputs.semVer }} to dev environment..."
+          # TODO: replace with actual deployment commands
+
+      - name: Tag dev release
+        run: |
+          git tag "dev-${{ steps.version.outputs.semVer }}"
+          git push origin "dev-${{ steps.version.outputs.semVer }}"
+
+    outputs:
+      semVer: ${{ steps.version.outputs.semVer }}
+
+  deploy-test:
+    name: Deploy to Test
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v3
+        with:
+          versionSpec: '6.x'
+
+      - name: Determine version
+        id: version
+        uses: gittools/actions/gitversion/execute@v3
+        with:
+          useConfigFile: true
+
+      - name: Test deployment started
+        run: |
+          echo "========================================"
+          echo "  TEST DEPLOYMENT STARTED"
+          echo "  Version: test-${{ steps.version.outputs.semVer }}"
+          echo "  Commit:  ${{ github.sha }}"
+          echo "  Run:     ${{ github.run_number }}"
+          echo "========================================"
+
+      - name: Deploy to test
+        run: |
+          echo "Deploying test-${{ steps.version.outputs.semVer }} to test environment..."
+          # TODO: replace with actual deployment commands
+
+      - name: Tag test release
+        run: |
+          git tag "test-${{ steps.version.outputs.semVer }}"
+          git push origin "test-${{ steps.version.outputs.semVer }}"
+
+    outputs:
+      semVer: ${{ steps.version.outputs.semVer }}
+
+  deploy-live:
+    name: Deploy to Live
+    needs: deploy-test
+    runs-on: ubuntu-latest
+    environment: live
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install GitVersion
+        uses: gittools/actions/gitversion/setup@v3
+        with:
+          versionSpec: '6.x'
+
+      - name: Determine version
+        id: version
+        uses: gittools/actions/gitversion/execute@v3
+        with:
+          useConfigFile: true
+
+      - name: Live deployment started
+        run: |
+          echo "========================================"
+          echo "  LIVE DEPLOYMENT STARTED"
+          echo "  Version: v-${{ steps.version.outputs.semVer }}"
+          echo "  Commit:  ${{ github.sha }}"
+          echo "  Run:     ${{ github.run_number }}"
+          echo "========================================"
+
+      - name: Deploy to live
+        run: |
+          echo "Deploying v-${{ steps.version.outputs.semVer }} to live environment..."
+          # TODO: replace with actual deployment commands
+
+      - name: Tag live release
+        run: |
+          git tag "v-${{ steps.version.outputs.semVer }}"
+          git push origin "v-${{ steps.version.outputs.semVer }}"
+
+    outputs:
+      semVer: ${{ steps.version.outputs.semVer }}
